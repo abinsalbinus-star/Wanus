@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Petualangan Matematika - Open World MTK</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body {
+    width:100%; height:100%; overflow:hidden;
+    font-family:'Segoe UI', Tahoma, sans-serif;
+    background:#0a1a0f; color:#fff; touch-action:none; user-select:none;
+  }
+  #gameCanvas { display:block; width:100%; height:100%; }
+
+  /* ===== HUD ===== */
+  .hud {
+    position:fixed; inset:0; pointer-events:none; z-index:10;
+    display:flex; flex-direction:column; justify-content:space-between;
+    padding:calc(env(safe-area-inset-top, 0px) + 10px) 12px 12px;
+  }
+  .hud-top { display:flex; justify-content:space-between; gap:8px; }
+  .pill {
+    background:rgba(10,26,15,0.8);
+    border:1px solid rgba(122,255,168,0.5);
+    backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+    padding:8px 14px; border-radius:50px;
+    font-size:0.78rem; font-weight:700; letter-spacing:0.5px;
+    display:flex; align-items:center; gap:6px;
+    box-shadow:0 4px 12px rgba(0,0,0,0.4);
+  }
+  .pill .val { color:#7affa8; font-size:1rem; }
+  .pill.score-pill { color:#ffd966; border-color:rgba(255,217,102,0.5); }
+  .pill.score-pill .val { color:#ffd966; }
+
+  .hud-bottom { display:flex; flex-direction:column; align-items:center; gap:8px; }
+  .hint {
+    font-size:0.7rem; color:#9ad5ff; background:rgba(10,26,15,0.7);
+    padding:4px 12px; border-radius:20px; letter-spacing:0.3px;
+    text-align:center; max-width:90vw;
+  }
+  #actionBtn {
+    pointer-events:auto;
+    background:linear-gradient(135deg,#1e4b3a,#0f2c1e);
+    border:1px solid #4ade80; color:#fff;
+    padding:14px 26px; border-radius:50px;
+    font-size:0.95rem; font-weight:800; letter-spacing:1px;
+    text-transform:uppercase; cursor:pointer;
+    box-shadow:0 6px 20px rgba(0,0,0,0.5);
+    transition:transform 0.12s, background 0.25s, color 0.25s;
+  }
+  #actionBtn:active { transform:scale(0.94); }
+  #actionBtn.active {
+    background:linear-gradient(135deg,#7affa8,#4ade80);
+    color:#062018; border-color:#b6ffce;
+    animation:pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { box-shadow:0 6px 20px rgba(122,255,168,0.4); }
+    50% { box-shadow:0 6px 28px rgba(122,255,168,0.9); }
+  }
+
+  /* ===== Modal Soal ===== */
+  .modal {
+    position:fixed; inset:0; z-index:50;
+    background:rgba(0,0,0,0.88);
+    backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+    display:flex; align-items:center; justify-content:center;
+    padding:14px;
+    opacity:0; visibility:hidden; transition:opacity 0.25s;
+  }
+  .modal.show { opacity:1; visibility:visible; }
+  .card {
+    width:100%; max-width:420px; max-height:92vh; overflow-y:auto;
+    background:linear-gradient(160deg,#0e2a1c,#061810);
+    border:2px solid #4ade80; border-radius:24px;
+    padding:20px 18px; box-shadow:0 25px 60px rgba(0,0,0,0.8);
+    animation:pop 0.3s ease;
+  }
+  @keyframes pop {
+    from { transform:scale(0.9); opacity:0; }
+    to { transform:scale(1); opacity:1; }
+  }
+  .card-head {
+    display:flex; justify-content:space-between; align-items:center;
+    margin-bottom:12px; padding-bottom:10px;
+    border-bottom:1px dashed rgba(122,255,168,0.4);
+  }
+  .card-head h2 {
+    font-size:0.95rem; color:#7affa8; letter-spacing:1.5px;
+    text-transform:uppercase;
+  }
+  .qnum {
+    background:#1e4b3a; border:1px solid #4ade80;
+    font-size:0.72rem; padding:4px 10px; border-radius:20px;
+    color:#b6ffce; font-weight:700;
+  }
+  .qtype {
+    display:inline-block; font-size:0.65rem; font-weight:800;
+    padding:3px 10px; border-radius:20px; letter-spacing:1px;
+    margin-bottom:10px; text-transform:uppercase;
+  }
+  .qtype.kali { background:rgba(255,217,102,0.2); color:#ffd966; border:1px solid #ffd966; }
+  .qtype.bagi { background:rgba(155,141,255,0.2); color:#b8aaff; border:1px solid #b8aaff; }
+  .qtype.tambah { background:rgba(255,146,146,0.2); color:#ff9292; border:1px solid #ff9292; }
+  .qtype.kurang { background:rgba(122,255,168,0.2); color:#7affa8; border:1px solid #7affa8; }
+
+  .qtext {
+    font-size:1.35rem; font-weight:700; line-height:1.5;
+    background:rgba(26,62,40,0.6);
+    padding:20px 14px; border-radius:14px;
+    border-left:4px solid #7affa8;
+    margin-bottom:14px; text-align:center;
+    color:#e8fff0; letter-spacing:1px;
+  }
+  .opts { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+  .opt {
+    background:#12301f; border:1.5px solid #2a6f4a;
+    color:#e8f4fa; padding:16px 10px;
+    border-radius:14px; font-size:1rem; text-align:center;
+    cursor:pointer; transition:all 0.15s;
+    font-weight:700; letter-spacing:0.5px;
+  }
+  .opt:active { transform:scale(0.97); }
+  .opt.correct { background:#1c5236; border-color:#4dd18a; color:#d6ffe6; }
+  .opt.wrong { background:#5a1e1e; border-color:#e06b6b; color:#ffd6d6; }
+  .opt.disabled { pointer-events:none; }
+
+  .feedback {
+    margin-top:14px; font-size:0.82rem; line-height:1.5;
+    padding:12px; border-radius:12px;
+    background:rgba(30,75,50,0.5); border-left:3px solid #4ade80;
+    display:none;
+  }
+  .feedback.show { display:block; animation:fadeIn 0.3s; }
+  @keyframes fadeIn { from{opacity:0; transform:translateY(-4px);} to{opacity:1; transform:none;} }
+  .feedback.ok { border-left-color:#4dd18a; background:rgba(28,82,54,0.5); }
+  .feedback.no { border-left-color:#e06b6b; background:rgba(90,30,30,0.5); }
+  .feedback b { color:#ffd966; }
+
+  .btn-next {
+    width:100%; margin-top:14px; padding:14px;
+    background:linear-gradient(135deg,#7affa8,#4ade80);
+    border:none; border-radius:14px;
+    color:#062018; font-weight:800; font-size:0.95rem;
+    letter-spacing:1px; text-transform:uppercase; cursor:pointer;
+    opacity:0.4; pointer-events:none;
+    transition:opacity 0.2s;
+  }
+  .btn-next.ready { opacity:1; pointer-events:auto; }
+  .btn-next:active { transform:scale(0.97); }
+
+  /* ===== Toast ===== */
+  #toast {
+    position:fixed; bottom:110px; left:50%; transform:translateX(-50%);
+    background:rgba(10,26,15,0.95); border:1px solid #7affa8;
+    color:#7affa8; padding:10px 20px; border-radius:50px;
+    font-size:0.82rem; font-weight:700; z-index:80;
+    opacity:0; pointer-events:none; transition:opacity 0.3s;
+    white-space:nowrap; max-width:90vw; overflow:hidden; text-overflow:ellipsis;
+  }
+  #toast.show { opacity:1; }
+
+  /* ===== Loading ===== */
+  #loader {
+    position:fixed; inset:0; background:#0a1a0f; z-index:999;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:16px;
+    transition:opacity 0.6s;
+  }
+  #loader.hide { opacity:0; pointer-events:none; }
+  #loader .title {
+    font-size:1.1rem; color:#7affa8; letter-spacing:3px; font-weight:800;
+    text-align:center; padding:0 20px;
+  }
+  #loader .sub { font-size:0.75rem; color:#4ade80; letter-spacing:2px; }
+  .spin {
+    width:44px; height:44px; border-radius:50%;
+    border:3px solid rgba(74,222,128,0.3);
+    border-top-color:#7affa8;
+    animation:spin 0.9s linear infinite;
+  }
+  @keyframes spin { to{transform:rotate(360deg);} }
+
+  /* ===== Minimap ===== */
+  #minimapBox {
+    position:fixed; top:calc(env(safe-area-inset-top, 0px) + 58px);
+    right:12px; width:78px; height:78px; z-index:9;
+    border-radius:50%;
+    background:radial-gradient(circle, rgba(10,26,15,0.95), rgba(10,26,15,0.7));
+    border:1.5px solid rgba(74,222,128,0.7);
+    pointer-events:none;
+    box-shadow:0 4px 12px rgba(0,0,0,0.5);
+  }
+  #minimap { width:100%; height:100%; border-radius:50%; }
+
+  /* ===== Win Screen ===== */
+  .win-screen {
+    position:fixed; inset:0; z-index:200;
+    background:radial-gradient(circle, rgba(10,26,15,0.98), rgba(0,0,0,0.98));
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:20px; padding:24px; text-align:center;
+    opacity:0; visibility:hidden; transition:opacity 0.5s;
+  }
+  .win-screen.show { opacity:1; visibility:visible; }
+  .win-screen h1 {
+    font-size:2rem; color:#ffd966; letter-spacing:3px;
+    text-shadow:0 0 20px rgba(255,217,102,0.6);
+    animation:bounce 1s ease infinite alternate;
+  }
+  @keyframes bounce { to { transform:translateY(-8px); } }
+  .win-screen p { font-size:1rem; color:#b6ffce; max-width:320px; line-height:1.6; }
+  .win-screen .final-score {
+    font-size:2.4rem; font-weight:900; color:#7affa8;
+    text-shadow:0 0 30px rgba(122,255,168,0.8);
+  }
+  .win-screen button {
+    background:linear-gradient(135deg,#7affa8,#4ade80);
+    color:#062018; border:none; padding:14px 32px;
+    border-radius:50px; font-weight:800; font-size:1rem;
+    letter-spacing:1px; cursor:pointer; text-transform:uppercase;
+    box-shadow:0 8px 24px rgba(122,255,168,0.4);
+  }
+  .win-screen button:active { transform:scale(0.96); }
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<!-- ===== HUD ===== -->
+<div class="hud">
+  <div class="hud-top">
+    <div class="pill score-pill">⭐ Skor <span class="val" id="hudScore">0</span></div>
+    <div class="pill">🧮 Soal <span class="val" id="hudProgress">0/20</span></div>
+  </div>
+  <div class="hud-bottom">
+    <div class="hint" id="hintTxt">Geser layar untuk melihat sekeliling</div>
+    <button id="actionBtn">🎯 Jelajahi Soal</button>
+  </div>
+</div>
+
+<!-- Minimap -->
+<div id="minimapBox"><canvas id="minimap" width="156" height="156"></canvas></div>
+
+<!-- ===== Modal Soal ===== -->
+<div class="modal" id="quizModal">
+  <div class="card">
+    <div class="card-head">
+      <h2>🧮 Soal Matematika</h2>
+      <div class="qnum" id="qNumber">1 / 20</div>
+    </div>
+    <div class="qtype" id="qType">PENJUMLAHAN</div>
+    <div class="qtext" id="qText">Memuat pertanyaan…</div>
+    <div class="opts" id="optsBox"></div>
+    <div class="feedback" id="feedback"></div>
+    <button class="btn-next" id="nextBtn">Lanjut ▸</button>
+  </div>
+</div>
+
+<!-- ===== Win Screen ===== -->
+<div class="win-screen" id="winScreen">
+  <h1>🎉 SELAMAT! 🎉</h1>
+  <p>Kamu berhasil menyelesaikan semua 20 soal matematika!</p>
+  <div class="final-score" id="finalScore">0</div>
+  <p>Skor Akhir</p>
+  <button id="playAgainBtn">🔄 Main Lagi</button>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Loader -->
+<div id="loader">
+  <div class="spin"></div>
+  <div class="title">MEMUAT DUNIA MATEMATIKA</div>
+  <div class="sub">PERKALIAN · PEMBAGIAN · PENJUMLAHAN</div>
+</div>
+
+<!-- ===== JSON SOAL MATEMATIKA ===== -->
+<script id="quizData" type="application/json">
+{
+  "mataPelajaran": "Matematika",
+  "materi": ["Perkalian", "Pembagian", "Penjumlahan", "Pengurangan"],
+  "jumlahSoal": 20,
+  "soal": [
+    {
+      "id": 1,
+      "tipe": "tambah",
+      "pertanyaan": "15 + 27 = ?",
+      "pilihan": [42, 40, 43, 41],
+      "jawaban": 0,
+      "penjelasan": "15 + 27 = 42. Jumlahkan satuan: 5+7=12 (tulis 2 simpan 1), lalu puluhan: 1+2+1=4. Hasil: 42."
+    },
+    {
+      "id": 2,
+      "tipe": "kali",
+      "pertanyaan": "7 × 8 = ?",
+      "pilihan": [54, 56, 58, 52],
+      "jawaban": 1,
+      "penjelasan": "7 × 8 = 56. Ingat tabel perkalian: 7 × 8 artinya 7 dijumlahkan 8 kali = 56."
+    },
+    {
+      "id": 3,
+      "tipe": "bagi",
+      "pertanyaan": "72 ÷ 8 = ?",
+      "pilihan": [8, 9, 7, 10],
+      "jawaban": 1,
+      "penjelasan": "72 ÷ 8 = 9. Karena 8 × 9 = 72, maka 72 dibagi 8 hasilnya 9."
+    },
+    {
+      "id": 4,
+      "tipe": "tambah",
+      "pertanyaan": "48 + 35 = ?",
+      "pilihan": [82, 84, 83, 81],
+      "jawaban": 2,
+      "penjelasan": "48 + 35 = 83. Satuan: 8+5=13 (tulis 3 simpan 1), puluhan: 4+3+1=8. Hasil: 83."
+    },
+    {
+      "id": 5,
+      "tipe": "kali",
+      "pertanyaan": "12 × 9 = ?",
+      "pilihan": [108, 99, 118, 112],
+      "jawaban": 0,
+      "penjelasan": "12 × 9 = 108. Bisa dihitung: (10×9) + (2×9) = 90 + 18 = 108."
+    },
+    {
+      "id": 6,
+      "tipe": "bagi",
+      "pertanyaan": "144 ÷ 12 = ?",
+      "pilihan": [11, 13, 12, 14],
+      "jawaban": 2,
+      "penjelasan": "144 ÷ 12 = 12. Karena 12 × 12 = 144, maka hasilnya 12."
+    },
+    {
+      "id": 7,
+      "tipe": "kurang",
+      "pertanyaan": "85 − 47 = ?",
+      "pilihan": [38, 42, 35, 40],
+      "jawaban": 0,
+      "penjelasan": "85 − 47 = 38. Bisa pakai cara: 85 − 40 = 45, lalu 45 − 7 = 38."
+    },
+    {
+      "id": 8,
+      "tipe": "kali",
+      "pertanyaan": "6 × 7 = ?",
+      "pilihan": [42, 48, 36, 45],
+      "jawaban": 0,
+      "penjelasan": "6 × 7 = 42. Hasil perkalian ini sering muncul, hafalkan tabel perkalian 6 dan 7."
+    },
+    {
+      "id": 9,
+      "tipe": "tambah",
+      "pertanyaan": "156 + 278 = ?",
+      "pilihan": [424, 434, 444, 414],
+      "jawaban": 1,
+      "penjelasan": "156 + 278 = 434. Satuan: 6+8=14, puluhan: 5+7+1=13, ratusan: 1+2+1=4. Hasil: 434."
+    },
+    {
+      "id": 10,
+      "tipe": "bagi",
+      "pertanyaan": "96 ÷ 6 = ?",
+      "pilihan": [14, 15, 16, 17],
+      "jawaban": 2,
+      "penjelasan": "96 ÷ 6 = 16. Karena 6 × 16 = 96, maka 96 ÷ 6 = 16."
+    },
+    {
+      "id": 11,
+      "tipe": "kali",
+      "pertanyaan": "15 × 4 = ?",
+      "pilihan": [55, 65, 60, 70],
+      "jawaban": 2,
+      "penjelasan": "15 × 4 = 60. Bisa dihitung: (10×4) + (5×4) = 40 + 20 = 60."
+    },
+    {
+      "id": 12,
+      "tipe": "kurang",
+      "pertanyaan": "100 − 63 = ?",
+      "pilihan": [47, 37, 43, 33],
+      "jawaban": 1,
+      "penjelasan": "100 − 63 = 37. Bisa pakai cara: 100 − 60 = 40, lalu 40 − 3 = 37."
+    },
+    {
+      "id": 13,
+      "tipe": "bagi",
+      "pertanyaan": "81 ÷ 9 = ?",
+      "pilihan": [7, 8, 9, 10],
+      "jawaban": 2,
+      "penjelasan": "81 ÷ 9 = 9. Karena 9 × 9 = 81, maka 81 ÷ 9 = 9."
+    },
+    {
+      "id": 14,
+      "tipe": "tambah",
+      "pertanyaan": "234 + 189 = ?",
+      "pilihan": [413, 423, 433, 403],
+      "jawaban": 1,
+      "penjelasan": "234 + 189 = 423. Satuan: 4+9=13, puluhan: 3+8+1=12, ratusan: 2+1+1=4. Hasil: 423."
+    },
+    {
+      "id": 15,
+      "tipe": "kali",
+      "pertanyaan": "25 × 8 = ?",
+      "pilihan": [180, 200, 220, 160],
+      "jawaban": 1,
+      "penjelasan": "25 × 8 = 200. Karena 25 × 4 = 100, maka 25 × 8 = 100 × 2 = 200."
+    },
+    {
+      "id": 16,
+      "tipe": "bagi",
+      "pertanyaan": "120 ÷ 5 = ?",
+      "pilihan": [20, 22, 24, 26],
+      "jawaban": 2,
+      "penjelasan": "120 ÷ 5 = 24. Karena 5 × 24 = 120, maka 120 ÷ 5 = 24."
+    },
+    {
+      "id": 17,
+      "tipe": "kurang",
+      "pertanyaan": "250 − 175 = ?",
+      "pilihan": [65, 75, 85, 95],
+      "jawaban": 1,
+      "penjelasan": "250 − 175 = 75. Bisa pakai cara: 250 − 100 = 150, lalu 150 − 75 = 75."
+    },
+    {
+      "id": 18,
+      "tipe": "kali",
+      "pertanyaan": "13 × 11 = ?",
+      "pilihan": [143, 133, 153, 123],
+      "jawaban": 0,
+      "penjelasan": "13 × 11 = 143. Bisa dihitung: (13×10) + (13×1) = 130 + 13 = 143."
+    },
+    {
+      "id": 19,
+      "tipe": "tambah",
+      "pertanyaan": "321 + 459 = ?",
+      "pilihan": [770, 780, 790, 760],
+      "jawaban": 1,
+      "penjelasan": "321 + 459 = 780. Satuan: 1+9=10, puluhan: 2+5+1=8, ratusan: 3+4=7. Hasil: 780."
+    },
+    {
+      "id": 20,
+      "tipe": "bagi",
+      "pertanyaan": "225 ÷ 15 = ?",
+      "pilihan": [13, 15, 17, 19],
+      "jawaban": 1,
+      "penjelasan": "225 ÷ 15 = 15. Karena 15 × 15 = 225, maka 225 ÷ 15 = 15."
+    }
+  ]
+}
+</script>
+
+<!-- ===== Three.js Library ===== -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<!-- ===== Game Logic ===== -->
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+/* ============================================================
+   1. LOAD JSON SOAL
+============================================================ */
+const QUIZ = JSON.parse(document.getElementById('quizData').textContent);
+const QUESTIONS = QUIZ.soal;
+
+// Warna per tipe soal
+const TYPE_COLORS = {
+  kali:   0xffd966,
+  bagi:   0xb8aaff,
+  tambah: 0xff9292,
+  kurang: 0x7affa8
+};
+const TYPE_LABELS = {
+  kali:   'PERKALIAN',
+  bagi:   'PEMBAGIAN',
+  tambah: 'PENJUMLAHAN',
+  kurang: 'PENGURANGAN'
+};
+
+/* ============================================================
+   2. STATE
+============================================================ */
+const state = {
+  score: 0,
+  answered: 0,
+  total: QUESTIONS.length,
+  currentIsland: null,
+  nearestIsland: null,
+  quizOpen: false
+};
+
+/* ============================================================
+   3. DOM
+============================================================ */
+const $ = id => document.getElementById(id);
+const hudScore    = $('hudScore');
+const hudProgress = $('hudProgress');
+const actionBtn   = $('actionBtn');
+const hintTxt     = $('hintTxt');
+const quizModal   = $('quizModal');
+const qNumber     = $('qNumber');
+const qType       = $('qType');
+const qText       = $('qText');
+const optsBox     = $('optsBox');
+const feedback    = $('feedback');
+const nextBtn     = $('nextBtn');
+const toast       = $('toast');
+const loader      = $('loader');
+const minimapCtx  = $('minimap').getContext('2d');
+const winScreen   = $('winScreen');
+const finalScore  = $('finalScore');
+
+/* ============================================================
+   4. THREE.JS SETUP
+============================================================ */
+const canvas = $('gameCanvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a1a0f);
+scene.fog = new THREE.FogExp2(0x0a1a0f, 0.016);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 300);
+camera.position.set(0, 16, 22);
+
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(innerWidth, innerHeight);
+Object.assign(labelRenderer.domElement.style, {
+  position:'fixed', top:'0', left:'0',
+  pointerEvents:'none', zIndex:'5'
+});
+document.body.appendChild(labelRenderer.domElement);
+
+/* ---- Controls ---- */
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.rotateSpeed = 0.6;
+controls.zoomSpeed = 0.8;
+controls.panSpeed = 0.6;
+controls.minDistance = 10;
+controls.maxDistance = 45;
+controls.maxPolarAngle = Math.PI * 0.48;
+controls.minPolarAngle = Math.PI * 0.15;
+controls.target.set(0, 0, 0);
+
+/* ============================================================
+   5. LIGHTING
+============================================================ */
+scene.add(new THREE.HemisphereLight(0x88ddaa, 0x112211, 0.9));
+scene.add(new THREE.AmbientLight(0x446655, 0.4));
+
+const sun = new THREE.DirectionalLight(0xfff0c0, 1.5);
+sun.position.set(18, 28, 12);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 90;
+const S = 35;
+sun.shadow.camera.left = -S;
+sun.shadow.camera.right = S;
+sun.shadow.camera.top = S;
+sun.shadow.camera.bottom = -S;
+sun.shadow.bias = -0.0005;
+scene.add(sun);
+
+const rim = new THREE.PointLight(0x4dd18a, 1.2, 60);
+rim.position.set(-15, 12, -15);
+scene.add(rim);
+
+/* ============================================================
+   6. GROUND (Padang Rumput Matematika)
+============================================================ */
+const groundGeo = new THREE.PlaneGeometry(300, 300, 96, 96);
+const groundMat = new THREE.MeshStandardMaterial({
+  color: 0x2a5f3a,
+  emissive: 0x0a1a0f,
+  roughness: 0.85,
+  metalness: 0.05
+});
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI/2;
+ground.position.y = -0.6;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const groundPositions = groundGeo.attributes.position.array.slice();
+
+// Jalur melingkar
+const ringGeo = new THREE.RingGeometry(12.5, 13.5, 64);
+const ringMat = new THREE.MeshBasicMaterial({
+  color: 0x7affa8, side: THREE.DoubleSide,
+  transparent: true, opacity: 0.25
+});
+const ring = new THREE.Mesh(ringGeo, ringMat);
+ring.rotation.x = -Math.PI/2;
+ring.position.y = -0.55;
+scene.add(ring);
+
+/* ============================================================
+   7. PLAYER (Robot Matematika)
+============================================================ */
+const player = new THREE.Group();
+
+// Body
+const bodyMat = new THREE.MeshStandardMaterial({
+  color: 0x4db8ff, metalness: 0.7, roughness: 0.3,
+  emissive: 0x1a3a5a, emissiveIntensity: 0.3
+});
+const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.4, 0.8), bodyMat);
+body.position.y = 1.1;
+body.castShadow = true;
+body.receiveShadow = true;
+player.add(body);
+
+// Head
+const headMat = new THREE.MeshStandardMaterial({
+  color: 0x9ad5ff, metalness: 0.8, roughness: 0.2,
+  emissive: 0x2a5a8a, emissiveIntensity: 0.4
+});
+const head = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 0.9), headMat);
+head.position.y = 2.35;
+head.castShadow = true;
+player.add(head);
+
+// Visor (mata)
+const visorMat = new THREE.MeshStandardMaterial({
+  color: 0x7affa8, emissive: 0x7affa8, emissiveIntensity: 1.5
+});
+const visor = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.25, 0.05), visorMat);
+visor.position.set(0, 2.4, 0.46);
+player.add(visor);
+
+// Antenna
+const antGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.6);
+const antMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.9 });
+const antenna = new THREE.Mesh(antGeo, antMat);
+antenna.position.set(0, 3.15, 0);
+player.add(antenna);
+
+const antBall = new THREE.Mesh(
+  new THREE.SphereGeometry(0.12, 12, 12),
+  new THREE.MeshStandardMaterial({ color: 0xffd966, emissive: 0xffd966, emissiveIntensity: 1.5 })
+);
+antBall.position.set(0, 3.5, 0);
+player.add(antBall);
+
+// Arms
+const armMat = new THREE.MeshStandardMaterial({ color: 0x4db8ff, metalness: 0.7, roughness: 0.3 });
+for (const side of [-1, 1]) {
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(0.25, 1.0, 0.25), armMat);
+  arm.position.set(side * 0.78, 1.15, 0);
+  arm.castShadow = true;
+  player.add(arm);
+}
+
+// Legs
+for (const side of [-1, 1]) {
+  const leg = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.7, 0.3), armMat);
+  leg.position.set(side * 0.32, 0.35, 0);
+  leg.castShadow = true;
+  player.add(leg);
+}
+
+player.position.set(0, 0, 0);
+player.rotation.y = 0;
+scene.add(player);
+
+// Player label
+const playerTag = document.createElement('div');
+playerTag.textContent = '🤖 KAMU';
+Object.assign(playerTag.style, {
+  color:'#4db8ff', fontWeight:'800', fontSize:'11px',
+  letterSpacing:'1px', padding:'2px 8px',
+  background:'rgba(10,26,15,0.9)',
+  border:'1px solid #4db8ff', borderRadius:'20px',
+  whiteSpace:'nowrap'
+});
+const playerLabel = new CSS2DObject(playerTag);
+playerLabel.position.set(0, 4.1, 0);
+player.add(playerLabel);
+
+/* ============================================================
+   8. ISLANDS / STATIONS (20 pos dengan soal)
+============================================================ */
+const stations = [];
+const RADIUS = 13;
+
+function createStation(index) {
+  const data = QUESTIONS[index];
+  const angle = (index / QUESTIONS.length) * Math.PI * 2 - Math.PI / 2;
+  const x = Math.cos(angle) * RADIUS;
+  const z = Math.sin(angle) * RADIUS;
+
+  const group = new THREE.Group();
+  group.position.set(x, 0, z);
+
+  const color = TYPE_COLORS[data.tipe] || 0x7affa8;
+
+  // Base platform
+  const baseMat = new THREE.MeshStandardMaterial({ color: 0x1e4b3a, roughness: 0.9 });
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.6, 0.5, 8), baseMat);
+  base.position.y = 0;
+  base.receiveShadow = true;
+  base.castShadow = true;
+  group.add(base);
+
+  // Top platform
+  const topMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.4, metalness: 0.3 });
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.3, 0.25, 8), topMat);
+  top.position.y = 0.37;
+  top.receiveShadow = true;
+  top.castShadow = true;
+  group.add(top);
+
+  // Crystal / floating orb
+  const crystalMat = new THREE.MeshStandardMaterial({
+    color: color, emissive: color, emissiveIntensity: 1.2,
+    roughness: 0.15, metalness: 0.6, transparent: true, opacity: 0.95
+  });
+  const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.5, 0), crystalMat);
+  crystal.position.y = 1.6;
+  crystal.castShadow = true;
+  group.add(crystal);
+
+  // Orbiting small spheres
+  const orbiters = [];
+  for (let i = 0; i < 3; i++) {
+    const s = new THREE.Mesh(
+      new THREE.SphereGeometry(0.12, 8, 8),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: color, emissiveIntensity: 1.5 })
+    );
+    s.position.y = 1.6;
+    group.add(s);
+    orbiters.push({ mesh: s, offset: (i / 3) * Math.PI * 2, radius: 0.9 });
+  }
+
+  // Point light
+  const light = new THREE.PointLight(color, 1.3, 6);
+  light.position.y = 1.6;
+  group.add(light);
+
+  // Symbol floating above (operator)
+  const symbolDiv = document.createElement('div');
+  const symbol = data.tipe === 'kali' ? '×' :
+                 data.tipe === 'bagi' ? '÷' :
+                 data.tipe === 'tambah' ? '+' : '−';
+  symbolDiv.textContent = symbol;
+  Object.assign(symbolDiv.style, {
+    color: '#' + color.toString(16).padStart(6, '0'),
+    fontSize: '32px', fontWeight: '900',
+    textShadow: '0 0 12px currentColor, 0 0 4px black',
+    fontFamily: 'Arial, sans-serif'
+  });
+  const symbolLabel = new CSS2DObject(symbolDiv);
+  symbolLabel.position.set(0, 2.8, 0);
+  group.add(symbolLabel);
+
+  // Question number label
+  const labelDiv = document.createElement('div');
+  labelDiv.textContent = `Soal ${index + 1}`;
+  Object.assign(labelDiv.style, {
+    color: '#fff', fontSize: '10px', fontWeight: '800',
+    padding: '3px 8px', borderRadius: '20px',
+    background: 'rgba(10,26,15,0.85)',
+    border: `1px solid #${color.toString(16).padStart(6,'0')}`,
+    whiteSpace: 'nowrap', letterSpacing: '0.5px'
+  });
+  const label = new CSS2DObject(labelDiv);
+  label.position.set(0, 3.4, 0);
+  group.add(label);
+
+  scene.add(group);
+
+  stations.push({
+    group, data, crystal, orbiters, light,
+    labelDiv, symbolDiv,
+    answered: false,
+    color,
+    position: new THREE.Vector3(x, 0, z)
+  });
+}
+
+for (let i = 0; i < QUESTIONS.length; i++) createStation(i);
+
+/* ============================================================
+   9. DEKORASI (Bintang, Bulan, Pohon)
+============================================================ */
+{
+  const starsGeo = new THREE.BufferGeometry();
+  const N = 700;
+  const pos = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    const r = 60 + Math.random() * 40;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.random() * Math.PI * 0.4;
+    pos[i*3]   = r * Math.sin(phi) * Math.cos(theta);
+    pos[i*3+1] = r * Math.cos(phi) + 15;
+    pos[i*3+2] = r * Math.sin(phi) * Math.sin(theta);
+  }
+  starsGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const starsMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.5, transparent: true, opacity: 0.85 });
+  scene.add(new THREE.Points(starsGeo, starsMat));
+}
+
+// Bulan
+const moon = new THREE.Mesh(
+  new THREE.SphereGeometry(2.2, 24, 24),
+  new THREE.MeshBasicMaterial({ color: 0xf0fff4 })
+);
+moon.position.set(-40, 35, -50);
+scene.add(moon);
+
+// Pohon-pohon hiasan di luar ring
+for (let i = 0; i < 24; i++) {
+  const a = Math.random() * Math.PI * 2;
+  const r = 18 + Math.random() * 25;
+  const tx = Math.cos(a) * r;
+  const tz = Math.sin(a) * r;
+
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.15, 0.2, 1.8, 6),
+    new THREE.MeshStandardMaterial({ color: 0x5a3a1f })
+  );
+  trunk.position.set(tx, 0.9, tz);
+  trunk.castShadow = true;
+  scene.add(trunk);
+
+  const leaves = new THREE.Mesh(
+    new THREE.ConeGeometry(1, 2, 7),
+    new THREE.MeshStandardMaterial({ color: 0x1e4b3a, roughness: 0.9 })
+  );
+  leaves.position.set(tx, 2.7, tz);
+  leaves.castShadow = true;
+  scene.add(leaves);
+}
+
+/* ============================================================
+   10. ANIMASI GROUND (gelombang halus)
+============================================================ */
+function animateGround(t) {
+  const pos = groundGeo.attributes.position.array;
+  for (let i = 0; i < pos.length; i += 3) {
+    const x = groundPositions[i];
+    const y = groundPositions[i+1];
+    pos[i+2] = Math.sin(x * 0.15 + t * 0.6) * 0.15 +
+               Math.cos(y * 0.15 + t * 0.5) * 0.15;
+  }
+  groundGeo.attributes.position.needsUpdate = true;
+}
+
+/* ============================================================
+   11. INTERAKSI PLAYER
+============================================================ */
+const INTERACT_DIST = 3.2;
+
+function findNearestStation() {
+  let nearest = null, minD = Infinity;
+  for (const st of stations) {
+    const d = player.position.distanceTo(st.position);
+    if (d < minD) { minD = d; nearest = st; }
+  }
+  if (minD <= INTERACT_DIST && !nearest.answered) return nearest;
+  return null;
+}
+
+function updateInteractUI() {
+  const near = findNearestStation();
+  state.nearestIsland = near;
+
+  if (near) {
+    actionBtn.textContent = `🧮 Jawab Soal ${near.data.id}`;
+    actionBtn.classList.add('active');
+    hintTxt.textContent = `Kamu dekat Soal ${near.data.id}! Tekan tombol untuk menjawab.`;
+  } else {
+    actionBtn.textContent = '🎯 Jelajahi Soal';
+    actionBtn.classList.remove('active');
+    hintTxt.textContent = 'Geser layar untuk melihat sekeliling';
+  }
+}
+
+actionBtn.addEventListener('click', () => {
+  if (state.quizOpen) return;
+  if (state.nearestIsland) {
+    openQuiz(state.nearestIsland);
+  } else {
+    showToast('Dekati pos soal yang memiliki tanda × ÷ + −');
+  }
+});
+
+/* ============================================================
+   12. MODAL QUIZ
+============================================================ */
+function openQuiz(station) {
+  state.currentIsland = station;
+  state.quizOpen = true;
+
+  const q = station.data;
+  qNumber.textContent = `${q.id} / ${QUESTIONS.length}`;
+  qText.textContent = q.pertanyaan;
+
+  // Set type label
+  qType.textContent = TYPE_LABELS[q.tipe] || 'SOAL';
+  qType.className = 'qtype ' + q.tipe;
+
+  optsBox.innerHTML = '';
+  feedback.className = 'feedback';
+  feedback.innerHTML = '';
+  nextBtn.classList.remove('ready');
+
+  // Buat opsi jawaban (diacak posisinya)
+  const shuffled = q.pilihan.map((val, idx) => ({ val, isCorrect: idx === q.jawaban }));
+  // Fisher-Yates shuffle
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  shuffled.forEach((opt, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'opt';
+    btn.textContent = opt.val;
+    btn.dataset.correct = opt.isCorrect ? '1' : '0';
+    btn.addEventListener('click', () => selectAnswer(opt.isCorrect, btn, q, station));
+    optsBox.appendChild(btn);
+  });
+
+  quizModal.classList.add('show');
+}
+
+function selectAnswer(isCorrect, btn, q, station) {
+  const opts = optsBox.querySelectorAll('.opt');
+  if (opts[0].classList.contains('disabled')) return;
+
+  opts.forEach(o => o.classList.add('disabled'));
+
+  if (isCorrect) {
+    btn.classList.add('correct');
+  } else {
+    btn.classList.add('wrong');
+    // Tunjukkan jawaban yang benar
+    opts.forEach(o => {
+      if (o.dataset.correct === '1') o.classList.add('correct');
+    });
+  }
+
+  // Feedback
+  feedback.classList.add('show', isCorrect ? 'ok' : 'no');
+  feedback.innerHTML = isCorrect
+    ? `✅ <b>Benar!</b> +10 poin<br>${q.penjelasan}`
+    : `❌ <b>Kurang tepat.</b><br>${q.penjelasan}`;
+
+  if (isCorrect) {
+    state.score += 10;
+    hudScore.textContent = state.score;
+  }
+
+  // Update station
+  station.answered = true;
+  station.labelDiv.textContent = isCorrect ? '✅ Selesai' : '❌ Selesai';
+  station.labelDiv.style.background = isCorrect ? 'rgba(28,82,54,0.95)' : 'rgba(90,30,30,0.95)';
+  station.labelDiv.style.borderColor = isCorrect ? '#4dd18a' : '#e06b6b';
+
+  // Ubah warna crystal
+  const newColor = isCorrect ? 0x4dd18a : 0xe06b6b;
+  station.crystal.material.color.setHex(newColor);
+  station.crystal.material.emissive.setHex(newColor);
+  station.light.color.setHex(newColor);
+  station.symbolDiv.style.color = isCorrect ? '#4dd18a' : '#e06b6b';
+
+  state.answered++;
+  hudProgress.textContent = `${state.answered}/${state.total}`;
+
+  nextBtn.classList.add('ready');
+
+  if (state.answered === state.total) {
+    setTimeout(() => {
+      quizModal.classList.remove('show');
+      state.quizOpen = false;
+      showWinScreen();
+    }, 900);
+  }
+}
+
+nextBtn.addEventListener('click', () => {
+  quizModal.classList.remove('show');
+  state.quizOpen = false;
+  state.currentIsland = null;
+  updateInteractUI();
+});
+
+/* ============================================================
+   13. WIN SCREEN
+============================================================ */
+function showWinScreen() {
+  finalScore.textContent = state.score;
+  winScreen.classList.add('show');
+  state.quizOpen = true; // lock interaksi
+}
+
+$('playAgainBtn').addEventListener('click', () => location.reload());
+
+/* ============================================================
+   14. TOAST
+============================================================ */
+let toastTimer = null;
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+}
+
+/* ============================================================
+   15. MINIMAP
+============================================================ */
+function drawMinimap() {
+  const W = 156, H = 156;
+  minimapCtx.clearRect(0, 0, W, H);
+
+  minimapCtx.beginPath();
+  minimapCtx.arc(W/2, H/2, W/2 - 6, 0, Math.PI*2);
+  minimapCtx.strokeStyle = 'rgba(74,222,128,0.7)';
+  minimapCtx.lineWidth = 1.5;
+  minimapCtx.stroke();
+
+  const cx = W/2, cy = H/2;
+  const scale = (W/2 - 12) / (RADIUS + 3);
+
+  // Stations
+  stations.forEach(st => {
+    const px = cx + st.position.x * scale;
+    const py = cy + st.position.z * scale;
+    minimapCtx.beginPath();
+    minimapCtx.arc(px, py, 3.5, 0, Math.PI*2);
+    if (st.answered) {
+      minimapCtx.fillStyle = st.crystal.material.color.getHex() === 0x4dd18a ? '#4dd18a' : '#e06b6b';
+    } else {
+      minimapCtx.fillStyle = '#' + st.color.toString(16).padStart(6, '0');
+    }
+    minimapCtx.fill();
+  });
+
+  // Player
+  const ppx = cx + player.position.x * scale;
+  const ppy = cy + player.position.z * scale;
+  minimapCtx.beginPath();
+  minimapCtx.arc(ppx, ppy, 5, 0, Math.PI*2);
+  minimapCtx.fillStyle = '#4db8ff';
+  minimapCtx.fill();
+  minimapCtx.strokeStyle = '#fff';
+  minimapCtx.lineWidth = 1.5;
+  minimapCtx.stroke();
+}
+
+/* ============================================================
+   16. RESIZE
+============================================================ */
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  labelRenderer.setSize(innerWidth, innerHeight);
+});
+
+/* ============================================================
+   17. LOOP
+============================================================ */
+const clock = new THREE.Clock();
+
+function animate() {
+  const t = clock.getElapsedTime();
+
+  animateGround(t);
+
+  // Bobbing player
+  player.position.y = 0.15 + Math.sin(t * 2) * 0.08;
+  player.rotation.z = Math.sin(t * 1.2) * 0.02;
+
+  // Antenna glow
+  antBall.material.emissiveIntensity = 1.2 + Math.sin(t * 3) * 0.5;
+
+  // Stations animation
+  stations.forEach((st, i) => {
+    // Crystal float & rotate
+    st.crystal.rotation.y = t * 0.8 + i;
+    st.crystal.rotation.x = t * 0.5 + i * 0.5;
+    st.crystal.position.y = 1.6 + Math.sin(t * 2 + i * 0.6) * 0.12;
+
+    // Orbiters
+    st.orbiters.forEach(orb => {
+      const a = t * 1.5 + orb.offset;
+      orb.mesh.position.x = Math.cos(a) * orb.radius;
+      orb.mesh.position.z = Math.sin(a) * orb.radius;
+      orb.mesh.position.y = 1.6 + Math.sin(t * 3 + orb.offset) * 0.15;
+    });
+
+    // Light pulse
+    if (!st.answered) {
+      st.light.intensity = 1.0 + Math.sin(t * 3 + i) * 0.4;
+    } else {
+      st.light.intensity = 0.7;
+    }
+  });
+
+  // Camera target follows player
+  controls.target.lerp(player.position, 0.05);
+  controls.update();
+
+  updateInteractUI();
+  drawMinimap();
+
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+
+  requestAnimationFrame(animate);
+}
+
+/* ============================================================
+   18. START
+============================================================ */
+hudProgress.textContent = `0/${state.total}`;
+hudScore.textContent = '0';
+
+setTimeout(() => {
+  loader.classList.add('hide');
+  setTimeout(() => loader.remove(), 800);
+}, 900);
+
+animate();
+</script>
+</body>
+</html>
